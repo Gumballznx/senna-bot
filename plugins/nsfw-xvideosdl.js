@@ -1,0 +1,49 @@
+import fetch from 'node-fetch'
+import fg from 'fg-senna'
+let handler = async (m, {conn, text, usedPrefix, command }) => {
+    let chat = global.db.data.chats[m.chat]
+
+    let user = global.db.data.users[m.sender].age
+
+    if (!text) throw `✳️ Insira lo que desea buscar`
+   m.react(rwait)
+
+   if (text.includes('http://') || text.includes('https://')) {
+        if (!text.includes('xvideos.com')) return m.reply(`❎ Revisa que link sea correcto`)
+
+        try {
+            let xv = await fg.xvideos(text)
+            if (!xv || !xv.url_dl) throw new Error('Falha ao extrair URL')
+            await conn.sendFile(m.chat, xv.url_dl, (xv.title || 'xvideos') + '.mp4', `
+≡  *XVIDEOS DL*
+
+*📌Titulo*: ${xv.title || 'Xvideos Video'}
+*👍Likes* : ${xv.likes || '--'}
+`.trim(), m, false, { asDocument: chat.useDocument })
+            m.react(done)
+        } catch (e) {
+            m.react('❌')
+            m.reply('🔴 Não foi possível obter o vídeo.')
+        }
+    } else {
+
+    try {
+    let res = await fg.sxvideos(text)
+    let fgg = res.map((v, i) => `📌 *Titulo* : ${v.title}\n⌚ *Duracion:* ${v.duration}\n*🔗Link:* ${v.url}\n`).join('─────────────────\n\n')
+    m.reply(fgg)
+    } catch (e) {
+    m.reply(`🔴 Error`, null, fwc)
+     }
+    }
+
+}
+handler.help = ['xvideos <busca|link>', 'xvideodl <link>']
+handler.tags = ['nsfw', 'prem']
+handler.command = ['xvideossearch', 'xvideo', 'xvideos', 'xvideodl']
+
+handler.group = true
+handler.diamond = 2
+handler.premium = false
+handler.register = true
+
+export default handler
