@@ -15,7 +15,8 @@ let handler = async (m, { conn, text, args, usedPrefix, command }) => {
   const finalPath = path.join(TEMP_DIR, `fb_${Date.now()}.mp4`)
 
   try {
-    await execAsync(`yt-dlp -f "b[vcodec^=avc]/b[vcodec^=h264]/hd/sd/bestvideo[ext=mp4]+bestaudio[ext=m4a]/best" --merge-output-format mp4 -o "${rawPath}" "${args[0]}"`, { timeout: 120000 })
+    const { downloadFacebookToFile } = await import('../lib/facebook.js')
+    await downloadFacebookToFile(args[0], rawPath)
     if (fs.existsSync(rawPath)) {
         let codec = 'h264'
         try {

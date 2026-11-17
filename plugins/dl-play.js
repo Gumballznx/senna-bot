@@ -1,4 +1,5 @@
 import { searchYouTube, downloadYT } from '../lib/ytHelper.js'
+import { ytResolveSized } from '../lib/savetube.js'
 import fs from 'fs'
 import axios from 'axios'
 import { exec } from 'child_process'
@@ -25,9 +26,15 @@ let handler = async (m, { conn, args, text, usedPrefix, command }) => {
 
     let { title, thumbnail, url, timestamp, views, ago, seconds, videoId } = vid
 
-    let audioSize = (seconds * 0.016).toFixed(1)
-
-    let videoSize = (seconds * 0.1).toFixed(1)
+    // Resolve os links já agora para mostrar o tamanho REAL (e reaproveitar no download)
+    const withTimeout = (p, ms) => Promise.race([p, new Promise(r => setTimeout(() => r(null), ms))])
+    const [preAudio, preVideo] = await Promise.all([
+        withTimeout(ytResolveSized(url, 'audio').catch(() => null), 25000),
+        withTimeout(ytResolveSized(url, 'video').catch(() => null), 25000)
+    ])
+    const mb = b => (b / (1024 * 1024)).toFixed(1)
+    let audioSize = preAudio?.size ? `${mb(preAudio.size)} MB` : `~${(seconds * 0.016).toFixed(1)} MB`
+    let videoSize = preVideo?.size ? `${mb(preVideo.size)} MB (${preVideo.quality}p)` : `~${(seconds * 0.1).toFixed(1)} MB`
 
     m.react('🎧')
 
@@ -40,8 +47,8 @@ let handler = async (m, { conn, args, text, usedPrefix, command }) => {
 └──────────────
 
 Responda com 1 ou 2:
-1 = MP3 (Áudio)  ~ ${audioSize} MB 🎵
-2 = MP4 (Vídeo)  ~ ${videoSize} MB 🎬
+1 = MP3 (Áudio)  ${audioSize} 🎵
+2 = MP4 (Vídeo)  ${videoSize} 🎬
 `
 
     let thumbUrl = thumbnail || (videoId ? `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg` : null)
@@ -76,6 +83,8 @@ Responda com 1 ou 2:
         url: url,
         title: title,
         chat: chat,
+        preAudio,
+        preVideo,
         timeout: setTimeout(() => {
             delete confirmation[senderId];
             delete confirmation[cleanSender];
@@ -104,7 +113,7 @@ handler.before = async (m, { conn }) => {
     const conf = confirmation[senderId] || confirmation[cleanSender] || confirmation[chatKey]
     if (!conf) return;
 
-    let { sender, timeout, url, chat, title } = conf;
+    let { sender, timeout, url, chat, title, preAudio, preVideo } = conf;
     const answer = m.text ? m.text.trim().toLowerCase() : ''
 
     if (/^(1|mp3|audio|áudio)$/i.test(answer)) {
@@ -114,7 +123,7 @@ handler.before = async (m, { conn }) => {
         delete confirmation[chatKey];
         m.react(rwait)
         try {
-            let resDL = await downloadYT(url, 'audio')
+            let resDL = await downloadYT(url, 'audio', preAudio)
             let fileName = (resDL.title === 'audio_video' || resDL.title.includes('yt_')) ? (title || resDL.title) : resDL.title
             if (fs.existsSync(resDL.filePath)) {
                 await conn.sendFile(m.chat, resDL.filePath, fileName + '.mp3', '', m, false, { mimetype: 'audio/mpeg', asDocument: chat?.useDocument })
@@ -136,7 +145,7 @@ handler.before = async (m, { conn }) => {
         delete confirmation[chatKey];
         m.react(rwait)
         try {
-            let resDL = await downloadYT(url, 'video')
+            let resDL = await downloadYT(url, 'video', preVideo)
             let fileName = (resDL.title === 'audio_video' || resDL.title.includes('yt_')) ? (title || resDL.title || 'video') : resDL.title
             if (fs.existsSync(resDL.filePath)) {
                 let user = global.db.data.users[m.sender] || {}
@@ -149,7 +158,7 @@ handler.before = async (m, { conn }) => {
                     fs.unlinkSync(resDL.filePath)
                     return m.reply(`❎ Tamanho excedido: ${(resDL.size / (1024 * 1024)).toFixed(2)} MB`)
                 }
-                await conn.sendFile(m.chat, resDL.filePath, fileName + '.mp4', `≡ *FG YTDL*\n\n▢ *📌Titulo* : ${fileName}`.trim(), m, false, { asDocument: true })
+                await conn.sendFile(m.chat, resDL.filePath, fileName + '.mp4', `≡ *FG YTDL*\n\n▢ *📌Titulo* : ${fileName}\n▢ *📦 Tamanho* : ${(resDL.size / (1024 * 1024)).toFixed(1)} MB`.trim(), m, false, { asVideo: true, mimetype: 'video/mp4', asDocument: chat?.useDocument })
                 try {
                     if (fs.existsSync(resDL.filePath)) fs.unlinkSync(resDL.filePath)
                 } catch(e) {}

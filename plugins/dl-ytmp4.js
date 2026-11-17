@@ -35,7 +35,7 @@ let handler = async (m, { conn, args, usedPrefix, command, isPrems, isOwner }) =
             `≡  *FG YTDL (yt-dlp)*\n\n*📌 Titulo:* ${title}\n*⚖️ Tamanho:* ${(size / (1024 * 1024)).toFixed(2)} MB`.trim(),
             m,
             false,
-            { asDocument: chat?.useDocument }
+            { asVideo: true, mimetype: 'video/mp4', asDocument: chat?.useDocument }
         )
 
         fs.unlinkSync(filePath)

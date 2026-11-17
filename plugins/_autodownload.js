@@ -271,7 +271,8 @@ export async function before(m, { conn, isOwner }) {
         const finalPath = path.join(TEMP_DIR, `fb_${Date.now()}.mp4`)
 
         try {
-            await execAsync(`yt-dlp -f "b[vcodec^=avc]/b[vcodec^=h264]/hd/sd/bestvideo[ext=mp4]+bestaudio[ext=m4a]/best" --merge-output-format mp4 -o "${rawPath}" "${link}"`, { timeout: 120000 })
+            const { downloadFacebookToFile } = await import('../lib/facebook.js')
+            await downloadFacebookToFile(link, rawPath)
             if (fs.existsSync(rawPath)) {
                 let codec = 'h264'
                 try {
@@ -468,7 +469,7 @@ export async function before(m, { conn, isOwner }) {
                     return m.reply('✳️ O arquivo superou o limite de 2GB do WhatsApp.')
                 }
 
-                await conn.sendFile(m.chat, filePath, `${title || 'video'}.mp4`, `✅ *Auto DL: YouTube (HD)*`, m, null, { asDocument: true })
+                await conn.sendFile(m.chat, filePath, `${title || 'video'}.mp4`, `✅ *Auto DL: YouTube*\n📦 ${(size / (1024 * 1024)).toFixed(1)} MB`, m, null, { asVideo: true, mimetype: 'video/mp4' })
 
                 if (fs.existsSync(filePath)) fs.unlinkSync(filePath)
                 m.react(done)
