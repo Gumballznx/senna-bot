@@ -624,8 +624,6 @@ if (m.isGroup && m.sender) {
 }
 
 export async function participantsUpdate({ id, participants, action }) {
-    global.groupMetaCache?.del(id)
-    this._groupMetadataCache?.delete?.(id)
     if (opts['self']) return
     if (global.db.data == null) await loadDatabase()
 
@@ -635,6 +633,34 @@ export async function participantsUpdate({ id, participants, action }) {
     const normalize = (p) =>
         typeof p === 'string' ? p : p?.id
 
+    // Nada aqui pode travar o envio: cada consulta ao WhatsApp/internet tem tempo máximo.
+    // (Antes esperava até 120 s por consulta + uma API de imagem fora do ar → 2 a 10 min de atraso.)
+    const withTimeout = (p, ms, fallback) => Promise.race([
+        Promise.resolve(p).catch(() => fallback),
+        new Promise(r => setTimeout(() => r(fallback), ms))
+    ])
+
+    // Atualiza a lista de membros no cache na hora (o Baileys usa essa lista para criptografar
+    // as mensagens do grupo; quem acabou de entrar precisa estar nela para ler as boas-vindas)
+    try {
+        const cached = global.groupMetaCache?.get(id)
+        if (cached && Array.isArray(cached.participants)) {
+            const ids = participants.map(normalize).filter(Boolean)
+            if (action === 'add') {
+                for (const pid of ids) if (!cached.participants.some(x => x.id === pid)) cached.participants.push({ id: pid, admin: null })
+            } else if (action === 'remove') {
+                cached.participants = cached.participants.filter(x => !ids.includes(x.id))
+            } else if (action === 'promote' || action === 'demote') {
+                for (const x of cached.participants) if (ids.includes(x.id)) x.admin = action === 'promote' ? 'admin' : null
+            }
+            global.groupMetaCache.set(id, cached)
+            this._groupMetadataCache?.set?.(id, { data: cached, ts: Date.now() })
+        } else {
+            this._groupMetadataCache?.delete?.(id)
+        }
+    } catch (_) {}
+
+    try {
     switch (action) {
 
         case 'add':
@@ -642,56 +668,38 @@ export async function participantsUpdate({ id, participants, action }) {
             if (!chat.welcome) break
 
             let groupMetadata =
-                await (this.getGroupMetadata ? this.getGroupMetadata(id) : this.groupMetadata(id)).catch(_ => null) ||
-                (conn.chats[id] || {}).metadata
-
-            if (!groupMetadata) return
+                global.groupMetaCache?.get(id) ||
+                (conn.chats[id] || {}).metadata ||
+                await withTimeout(this.getGroupMetadata ? this.getGroupMetadata(id) : this.groupMetadata(id), 8000, null) ||
+                {}
 
             for (let participant of participants) {
 
                 const user = normalize(participant)
                 if (!user) continue
 
-                let pp = fg_avatar
-                let ppgp = fg_avatar
-
-                try { pp = await this.profilePictureUrl(user, 'image') } catch {}
-                try { ppgp = await this.profilePictureUrl(id, 'image') } catch {}
-
                 text = (action === 'add'
                     ? (chat.sWelcome || this.welcome || conn.welcome || 'Bienvenido, @user')
-                        .replace('@group', await this.getName(id))
+                        .replace('@group', groupMetadata.subject || '')
                         .replace('@desc', groupMetadata.desc?.toString() || 'Desconocido')
                     : (chat.sBye || this.bye || conn.bye || 'Adiós, @user')
                 ).replace('@user', '@' + user.split('@')[0])
 
-                try {
-                    let imageUrl = action === 'add'
-                        ? API('fgmods', '/api/welcome', {
-                            username: await this.getName(user),
-                            groupname: await this.getName(id),
-                            groupicon: ppgp,
-                            membercount: groupMetadata.participants?.length || 0,
-                            profile: pp,
-                            background: 'https://i.ibb.co/fkFmQC2/eve.jpg'
-                        }, 'apikey')
-                        : API('fgmods', '/api/goodbye2', {
-                            username: await this.getName(user),
-                            groupname: await this.getName(id),
-                            groupicon: ppgp,
-                            membercount: groupMetadata.participants?.length || 0,
-                            profile: pp,
-                            background: 'https://i.ibb.co/jh9367t/akali.jpg'
-                        }, 'apikey')
+                // Foto de perfil (máx. 5 s para achar o link e 8 s para baixar); sem foto, vai só o texto
+                let image = null
+                const ppUrl = await withTimeout(this.profilePictureUrl(user, 'image'), 5000, null)
+                if (ppUrl) {
+                    try {
+                        const axios = (await import('axios')).default
+                        const res = await axios.get(ppUrl, { responseType: 'arraybuffer', timeout: 8000 })
+                        image = Buffer.from(res.data)
+                    } catch (_) {}
+                }
 
-                    await this.sendFile(id, imageUrl, 'welcome.jpg', text, null, false, {
-                        mentions: [user]
-                    })
-
-                } catch {
-                    await this.sendFile(id, pp, 'profile.jpg', text, null, false, {
-                        mentions: [user]
-                    })
+                if (image) {
+                    await this.sendMessage(id, { image, caption: text, mentions: [user] })
+                } else {
+                    await this.sendMessage(id, { text, mentions: [user] })
                 }
             }
             break
@@ -705,8 +713,7 @@ export async function participantsUpdate({ id, participants, action }) {
                 const user = normalize(participant)
                 if (!user) continue
 
-                let pp = await this.profilePictureUrl(user, 'image')
-                    .catch(_ => global.fg_avatar)
+                let pp = await withTimeout(this.profilePictureUrl(user, 'image'), 5000, global.fg_avatar) || global.fg_avatar
 
                 text = action === 'promote'
                     ? (chat.sPromote || this.spromote || conn.spromote || '@user ahora es administrador 🛡️')
@@ -719,6 +726,9 @@ export async function participantsUpdate({ id, participants, action }) {
                 })
             }
             break
+    }
+    } catch (e) {
+        console.error('[participantsUpdate] erro:', e?.message || e)
     }
 }
 
