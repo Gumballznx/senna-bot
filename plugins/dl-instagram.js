@@ -11,17 +11,18 @@ let handler = async (m, { conn, text, args, usedPrefix, command }) => {
   m.react(rwait)
 
   let success = false
+  const link = args[0].split('?')[0] // remove ?igsh=, ?dlrf=, ?mdxt= etc.
 
   try {
-    const link = args[0].split('?')[0] // remove ?igsh=, ?dlrf= etc.
     // Mesma API do fg.igdl, mas com TODOS os itens do carrossel
     let data = null
     try {
       const axiosIg = (await import('axios')).default
-      const { data: all } = await axiosIg.get(`https://backend1.tioo.eu.org/igdl?url=${encodeURIComponent(link)}`, { timeout: 30000 })
+      const { data: all } = await axiosIg.get(`https://backend1.tioo.eu.org/igdl?url=${encodeURIComponent(link)}`, { timeout: 12000 })
       if (Array.isArray(all) && all.length) data = { result: all.map(i => ({ url: i.url })) }
-    } catch (_) {}
-    if (!data) data = await Promise.race([
+    } catch (e) { var igApiDown = true }
+    // fg.igdl usa a mesma API; se ela caiu, não adianta esperar por ele
+    if (!data && typeof igApiDown === 'undefined') data = await Promise.race([
       fg.igdl(link),
       new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 20000))
     ]).catch(() => null)
@@ -82,7 +83,7 @@ let handler = async (m, { conn, text, args, usedPrefix, command }) => {
   if (fs.existsSync(cookiesPath)) cookiesFlag = `--cookies "${cookiesPath}"`
 
   try {
-    await execAsync(`yt-dlp ${cookiesFlag} -f "bestvideo[vcodec^=avc]+bestaudio/best[vcodec^=avc]/bestvideo+bestaudio/best" --merge-output-format mp4 -o "${rawPath}" "${args[0]}"`, { timeout: 35000 })
+    await execAsync(`yt-dlp ${cookiesFlag} -f "bestvideo[vcodec^=avc]+bestaudio/best[vcodec^=avc]/bestvideo+bestaudio/best" --merge-output-format mp4 -o "${rawPath}" "${link}"`, { timeout: 90000 })
     if (fs.existsSync(rawPath)) {
       let codec = 'h264'
       try {
