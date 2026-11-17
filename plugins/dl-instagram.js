@@ -13,10 +13,18 @@ let handler = async (m, { conn, text, args, usedPrefix, command }) => {
   let success = false
 
   try {
-    let data = await Promise.race([
-      fg.igdl(args[0]),
-      new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 6000))
-    ])
+    const link = args[0].split('?')[0] // remove ?igsh=, ?dlrf= etc.
+    // Mesma API do fg.igdl, mas com TODOS os itens do carrossel
+    let data = null
+    try {
+      const axiosIg = (await import('axios')).default
+      const { data: all } = await axiosIg.get(`https://backend1.tioo.eu.org/igdl?url=${encodeURIComponent(link)}`, { timeout: 30000 })
+      if (Array.isArray(all) && all.length) data = { result: all.map(i => ({ url: i.url })) }
+    } catch (_) {}
+    if (!data) data = await Promise.race([
+      fg.igdl(link),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 20000))
+    ]).catch(() => null)
     if (data) {
       let urls = []
       if (data.result && Array.isArray(data.result) && data.result.length >= 1) {

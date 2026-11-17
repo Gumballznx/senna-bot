@@ -136,7 +136,14 @@ export async function before(m, { conn, isOwner }) {
         found = true
         m.react(rwait)
         try {
-            let data = await Promise.race([
+            // Mesma API usada pelo fg.igdl, mas pegando TODOS os itens (carrossel); fg.igdl só devolve o 1º
+            let data = null
+            try {
+                const axiosIg = (await import('axios')).default
+                const { data: all } = await axiosIg.get(`https://backend1.tioo.eu.org/igdl?url=${encodeURIComponent(link)}`, { timeout: 30000 })
+                if (Array.isArray(all) && all.length) data = { result: all.map(i => ({ url: i.url })) }
+            } catch (_) {}
+            if (!data) data = await Promise.race([
                 fg.igdl(link).catch(() => null),
                 new Promise(resolve => setTimeout(() => resolve(null), 20000))
             ])
