@@ -685,16 +685,22 @@ export async function participantsUpdate({ id, participants, action }) {
                     : (chat.sBye || this.bye || conn.bye || 'Adiós, @user')
                 ).replace('@user', '@' + user.split('@')[0])
 
-                // Foto de perfil (máx. 5 s para achar o link e 8 s para baixar); sem foto, vai só o texto
+                // Imagem: foto da pessoa → foto do grupo → imagem padrão do bot (cada uma com tempo máximo).
+                // Quem sai do grupo ou esconde a foto na privacidade não tem foto disponível para o bot.
                 let image = null
-                const ppUrl = await withTimeout(this.profilePictureUrl(user, 'image'), 5000, null)
-                if (ppUrl) {
+                const axios = (await import('axios')).default
+                const baixar = async (url) => {
+                    if (!url) return null
                     try {
-                        const axios = (await import('axios')).default
-                        const res = await axios.get(ppUrl, { responseType: 'arraybuffer', timeout: 8000 })
-                        image = Buffer.from(res.data)
-                    } catch (_) {}
+                        const res = await axios.get(url, { responseType: 'arraybuffer', timeout: 8000 })
+                        return res.data?.length > 500 ? Buffer.from(res.data) : null
+                    } catch (_) { return null }
                 }
+                const [ppUser, ppGroup] = await Promise.all([
+                    withTimeout(this.profilePictureUrl(user, 'image'), 5000, null),
+                    withTimeout(this.profilePictureUrl(id, 'image'), 5000, null)
+                ])
+                image = await baixar(ppUser) || await baixar(ppGroup) || await baixar(global.fg_avatar)
 
                 if (image) {
                     await this.sendMessage(id, { image, caption: text, mentions: [user] })
