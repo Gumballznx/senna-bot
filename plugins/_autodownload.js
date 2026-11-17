@@ -130,13 +130,14 @@ export async function before(m, { conn, isOwner }) {
     }
 
     if (!found && instagramRegex.test(text)) {
-        let link = text.match(instagramRegex)[0]
+        // Remove parâmetros de rastreio (?dlrf=, ?igsh=, ?utm_...) que atrapalham alguns extratores
+        let link = text.match(instagramRegex)[0].split('?')[0]
         found = true
         m.react(rwait)
         try {
             let data = await Promise.race([
                 fg.igdl(link).catch(() => null),
-                new Promise(resolve => setTimeout(() => resolve(null), 6000))
+                new Promise(resolve => setTimeout(() => resolve(null), 20000))
             ])
             let success = false
 
