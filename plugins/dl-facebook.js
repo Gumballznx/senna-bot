@@ -1,4 +1,5 @@
 import fs from 'fs'
+import { sendVideoSmart, VIDEO_LIMIT } from '../lib/sendVideo.js'
 import path from 'path'
 import { exec } from 'child_process'
 import { promisify } from 'util'
@@ -18,6 +19,13 @@ let handler = async (m, { conn, text, args, usedPrefix, command }) => {
     const { downloadFacebookToFile } = await import('../lib/facebook.js')
     await downloadFacebookToFile(args[0], rawPath)
     if (fs.existsSync(rawPath)) {
+        // Maior que 60 MB: vai como documento na qualidade máxima, sem converter
+        if (fs.statSync(rawPath).size > VIDEO_LIMIT) {
+            await sendVideoSmart(conn, m.chat, rawPath, 'facebook.mp4', `✅ *Facebook*`, m)
+            try { fs.unlinkSync(rawPath) } catch (_) {}
+            m.react('✅')
+            return
+        }
         let codec = 'h264'
         try {
             const { stdout } = await execAsync(`ffprobe -v error -select_streams v:0 -show_entries stream=codec_name -of default=noprint_wrappers=1:nokey=1 "${rawPath}"`)
@@ -31,7 +39,7 @@ let handler = async (m, { conn, text, args, usedPrefix, command }) => {
         await execAsync(ffmpegCmd, { timeout: 180000 })
         if (fs.existsSync(rawPath)) fs.unlinkSync(rawPath)
         if (fs.existsSync(finalPath)) {
-            await conn.sendFile(m.chat, finalPath, 'fb.mp4', `✅ *Facebook (HD)*`, m, null, { asDocument: false })
+            await sendVideoSmart(conn, m.chat, finalPath, 'facebook.mp4', `✅ *Facebook*`, m)
             fs.unlinkSync(finalPath)
             m.react('✅')
             return

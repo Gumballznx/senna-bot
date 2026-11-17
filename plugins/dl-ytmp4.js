@@ -1,5 +1,6 @@
 import { downloadYT, getYTInfo } from '../lib/ytHelper.js'
 import fs from 'fs'
+import { sendVideoSmart } from '../lib/sendVideo.js'
 
 let free = 1000
 let prem = 2000
@@ -28,15 +29,9 @@ let handler = async (m, { conn, args, usedPrefix, command, isPrems, isOwner }) =
             return m.reply(`❎ *FG YTDL*\n\n▢ *⚖️ Tamanho*: ${(size / (1024 * 1024)).toFixed(2)} MB\n▢ _Supera o limite de download_ *+${limit} MB*`)
         }
 
-        await conn.sendFile(
-            m.chat,
-            filePath,
-            title + '.mp4',
-            `≡  *FG YTDL (yt-dlp)*\n\n*📌 Titulo:* ${title}\n*⚖️ Tamanho:* ${(size / (1024 * 1024)).toFixed(2)} MB`.trim(),
-            m,
-            false,
-            { asVideo: true, mimetype: 'video/mp4', asDocument: chat?.useDocument }
-        )
+        await sendVideoSmart(conn, m.chat, filePath, title + '.mp4', `≡  *FG YTDL*
+
+*📌 Titulo:* ${title}`, m)
 
         fs.unlinkSync(filePath)
         m.react(done)

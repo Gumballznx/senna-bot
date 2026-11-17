@@ -1,5 +1,6 @@
 import fg from 'fg-senna'
 import { downloadYT } from '../lib/ytHelper.js'
+import { sendVideoSmart, VIDEO_LIMIT } from '../lib/sendVideo.js'
 import fs from 'fs'
 import path from 'path'
 import { exec } from 'child_process'
@@ -275,6 +276,13 @@ export async function before(m, { conn, isOwner }) {
             const { downloadFacebookToFile } = await import('../lib/facebook.js')
             await downloadFacebookToFile(link, rawPath)
             if (fs.existsSync(rawPath)) {
+                // Maior que 60 MB: vai como documento na qualidade máxima, sem converter
+                if (fs.statSync(rawPath).size > VIDEO_LIMIT) {
+                    await sendVideoSmart(conn, m.chat, rawPath, 'facebook.mp4', `✅ *Facebook*`, m)
+                    try { fs.unlinkSync(rawPath) } catch (_) {}
+                    m.react('✅')
+                    return true
+                }
                 let codec = 'h264'
                 try {
                     const { stdout } = await execAsync(`ffprobe -v error -select_streams v:0 -show_entries stream=codec_name -of default=noprint_wrappers=1:nokey=1 "${rawPath}"`)
@@ -288,7 +296,7 @@ export async function before(m, { conn, isOwner }) {
                 await execAsync(ffmpegCmd, { timeout: 180000 })
                 if (fs.existsSync(rawPath)) fs.unlinkSync(rawPath)
                 if (fs.existsSync(finalPath)) {
-                    await conn.sendFile(m.chat, finalPath, 'fb.mp4', `✅ *Auto DL: Facebook*`, m, null, fwc)
+                    await sendVideoSmart(conn, m.chat, finalPath, 'facebook.mp4', `✅ *Auto DL: Facebook*`, m)
                     fs.unlinkSync(finalPath)
                     m.react(done)
                 } else {
@@ -470,7 +478,7 @@ export async function before(m, { conn, isOwner }) {
                     return m.reply('✳️ O arquivo superou o limite de 2GB do WhatsApp.')
                 }
 
-                await conn.sendFile(m.chat, filePath, `${title || 'video'}.mp4`, `✅ *Auto DL: YouTube*\n📦 ${(size / (1024 * 1024)).toFixed(1)} MB`, m, null, { asVideo: true, mimetype: 'video/mp4' })
+                await sendVideoSmart(conn, m.chat, filePath, `${title || 'video'}.mp4`, `✅ *Auto DL: YouTube*`, m)
 
                 if (fs.existsSync(filePath)) fs.unlinkSync(filePath)
                 m.react(done)

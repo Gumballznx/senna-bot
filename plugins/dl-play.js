@@ -1,5 +1,6 @@
 import { searchYouTube, downloadYT } from '../lib/ytHelper.js'
-import { ytResolveSized } from '../lib/savetube.js'
+import { ytResolveSized, ytResolveBest } from '../lib/savetube.js'
+import { sendVideoSmart, VIDEO_LIMIT } from '../lib/sendVideo.js'
 import fs from 'fs'
 import axios from 'axios'
 import { exec } from 'child_process'
@@ -30,11 +31,11 @@ let handler = async (m, { conn, args, text, usedPrefix, command }) => {
     const withTimeout = (p, ms) => Promise.race([p, new Promise(r => setTimeout(() => r(null), ms))])
     const [preAudio, preVideo] = await Promise.all([
         withTimeout(ytResolveSized(url, 'audio').catch(() => null), 25000),
-        withTimeout(ytResolveSized(url, 'video').catch(() => null), 25000)
+        withTimeout(ytResolveBest(url, 'video').catch(() => null), 30000)
     ])
     const mb = b => (b / (1024 * 1024)).toFixed(1)
     let audioSize = preAudio?.size ? `${mb(preAudio.size)} MB` : `~${(seconds * 0.016).toFixed(1)} MB`
-    let videoSize = preVideo?.size ? `${mb(preVideo.size)} MB (${preVideo.quality}p)` : `~${(seconds * 0.1).toFixed(1)} MB`
+    let videoSize = preVideo?.size ? `${mb(preVideo.size)} MB (${preVideo.quality}p)${preVideo.size > VIDEO_LIMIT ? ' 📁 documento' : ''}` : `~${(seconds * 0.1).toFixed(1)} MB`
 
     m.react('🎧')
 
@@ -158,7 +159,7 @@ handler.before = async (m, { conn }) => {
                     fs.unlinkSync(resDL.filePath)
                     return m.reply(`❎ Tamanho excedido: ${(resDL.size / (1024 * 1024)).toFixed(2)} MB`)
                 }
-                await conn.sendFile(m.chat, resDL.filePath, fileName + '.mp4', `≡ *FG YTDL*\n\n▢ *📌Titulo* : ${fileName}\n▢ *📦 Tamanho* : ${(resDL.size / (1024 * 1024)).toFixed(1)} MB`.trim(), m, false, { asVideo: true, mimetype: 'video/mp4', asDocument: chat?.useDocument })
+                await sendVideoSmart(conn, m.chat, resDL.filePath, fileName + '.mp4', `≡ *FG YTDL*\n\n▢ *📌Titulo* : ${fileName}`, m)
                 try {
                     if (fs.existsSync(resDL.filePath)) fs.unlinkSync(resDL.filePath)
                 } catch(e) {}
