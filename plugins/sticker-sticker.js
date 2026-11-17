@@ -44,6 +44,30 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
         }
       }
 
+      // Última tentativa: a citação de visualização única costuma vir sem a chave da mídia.
+      // Busca a mensagem ORIGINAL guardada quando ela chegou ao bot.
+      if ((!img || img.length === 0) && m.quoted) {
+        try {
+          const qid = m.quoted.id || m.msg?.contextInfo?.stanzaId
+          const raw = qid ? await conn.loadMessage?.(m.chat, qid) : null
+          const mm = raw?.message || {}
+          const inner = mm.viewOnceMessageV2?.message || mm.viewOnceMessageV2Extension?.message || mm.viewOnceMessage?.message || mm
+          const media = inner?.imageMessage || inner?.videoMessage
+          if (media?.mediaKey && media.mediaKey.length) {
+            const stream = await downloadContentFromMessage(media, inner.videoMessage ? 'video' : 'image')
+            let buffer = Buffer.from([])
+            for await (const chunk of stream) buffer = Buffer.concat([buffer, chunk])
+            img = buffer
+          }
+        } catch (e) {
+          console.error('[STICKER] busca da mensagem original falhou:', e?.message || e)
+        }
+      }
+
+      const isViewOnceQuote = !!(m.msg?.contextInfo?.quotedMessage && JSON.stringify(Object.keys(m.msg.contextInfo.quotedMessage)).match(/viewOnce/) || q.msg?.viewOnce || q.viewOnce)
+      if ((!img || img.length === 0) && isViewOnceQuote) {
+        throw `⚠️ Essa é uma mídia de *visualização única* e o WhatsApp não entregou o conteúdo dela para o bot.\n\nPeça para reenviar a mídia normalmente (sem visualização única) e use *${usedPrefix + command}*.`
+      }
       if (!img || img.length === 0) throw `✳️ Responda a uma imagem ou vídeo com *${usedPrefix + command}*`
 
       let out
@@ -69,6 +93,7 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
     if (!stiker) stiker = e
   } finally {
     if (stiker && Buffer.isBuffer(stiker)) conn.sendFile(m.chat, stiker, 'sticker.webp', '', m)
+    else if (typeof stiker === 'string') throw stiker
     else throw `A conversão falhou, tente responder a uma imagem/vídeo com *${usedPrefix + command}*`
   }
 }
