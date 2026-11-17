@@ -43,6 +43,26 @@ let handler = async (m, { conn, text, usedPrefix, command }) => {
     if (!text) throw `✳️ Digite o que deseja buscar\n\n📌 Exemplo: *${usedPrefix + command}* Mia Khalifa`
 
     m.react(rwait)
+
+    // Se mandaram um link do Pinterest, baixa o pin em vez de pesquisar
+    const pinLink = text.match(/https?:\/\/([a-z]+\.)?(pinterest\.[a-z.]+\/pin|pin\.it)\/[^\s]+/i)
+    if (pinLink) {
+        try {
+            const { pinterestDownload } = await import('../lib/pinterest.js')
+            const res = await pinterestDownload(pinLink[0])
+            if (res.type === 'video') {
+                await conn.sendFile(m.chat, res.url, 'pinterest.mp4', `📌 *Pinterest*`, m)
+            } else {
+                for (let url of res.urls.slice(0, 10)) await conn.sendFile(m.chat, url, 'pinterest.jpg', `📌 *Pinterest*`, m)
+            }
+            m.react(done)
+        } catch (e) {
+            m.react('❌')
+            m.reply(`❌ Erro ao baixar do Pinterest: ${e.message}`)
+        }
+        return
+    }
+
     try {
         let results = await searchPinterest(text)
         if (!results || !results.length) {

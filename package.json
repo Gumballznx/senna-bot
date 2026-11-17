@@ -24,16 +24,16 @@
   ],
   "author": {
     "name": "Gumball",
-    "url": "https://github.com/Gumballxnz"
+    "url": "https://github.com/Gumballznx"
   },
   "license": "GPL-3.0-or-later",
-  "homepage": "https://github.com/Gumballxnz/senna-bot",
+  "homepage": "https://github.com/Gumballznx/senna-bot",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/Gumballxnz/senna-bot.git"
+    "url": "git+https://github.com/Gumballznx/senna-bot.git"
   },
   "bugs": {
-    "url": "https://github.com/Gumballxnz/senna-bot/issues"
+    "url": "https://github.com/Gumballznx/senna-bot/issues"
   },
   "directories": {
     "lib": "lib",

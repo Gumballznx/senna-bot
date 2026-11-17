@@ -45,4 +45,4 @@ try {
 console.log('\nFormas de instalar:')
 console.log('  npx senna-bot init')
 console.log('  npx @gumballwotersan/senna-bot init')
-console.log('  npx github:Gumballxnz/senna-bot init')
+console.log('  npx github:Gumballznx/senna-bot init')

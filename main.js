@@ -94,6 +94,8 @@ const {state, saveState, saveCreds} = await useMultiFileAuthState(global.authFil
 const msgRetryCounterMap = new Map()
 const msgRetryCounterCache = new NodeCache({ stdTTL: 1800, checkperiod: 300 })
 const userDevicesCache = new NodeCache({ stdTTL: 1800, checkperiod: 300 })
+// Cache de metadados de grupo: evita que o Baileys consulte o WhatsApp a cada envio (erro rate-overlimit)
+global.groupMetaCache = global.groupMetaCache || new NodeCache({ stdTTL: 300, checkperiod: 120, useClones: false })
 const {version} = await fetchLatestBaileysVersion()
 
 const connectionOptions = {
@@ -114,6 +116,7 @@ const connectionOptions = {
     connectTimeoutMs: 60000,
     msgRetryCounterCache,
     userDevicesCache,
+    cachedGroupMetadata: async (jid) => global.groupMetaCache.get(jid),
     getMessage: async (key) => {
         let jid = jidNormalizedUser(key.remoteJid);
         let msg = await store.loadMessage(jid, key.id);
@@ -388,6 +391,10 @@ async function filesInit() {
 filesInit()
 
 process.on('unhandledRejection', (err) => {
+    if (String(err?.message || err).includes('rate-overlimit')) {
+        console.warn('[rate-overlimit] WhatsApp limitou as requisições; ignorando esta.')
+        return
+    }
     console.error('UNHANDLED:', err)
 })
 

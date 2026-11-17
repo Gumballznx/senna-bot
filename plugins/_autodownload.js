@@ -33,7 +33,7 @@ export async function before(m, { conn, isOwner }) {
     const megaRegex = /https?:\/\/mega\.nz\/file\/[^\s]*/i
     const youtubeRegex = /https?:\/\/(www\.|m\.)?(youtube\.com|youtu\.be)\/[^\s]*/i
     const twitterRegex = /https?:\/\/(www\.)?(twitter\.com|x\.com)\/[^\s]+/i
-    const pinterestRegex = /https?:\/\/(www\.)?(pinterest\.com\/pin|pin\.it)\/[^\s]*/i
+    const pinterestRegex = /https?:\/\/([a-z]+\.)?(pinterest\.[a-z.]+\/pin|pin\.it)\/[^\s]*/i
     const xvideosRegex = /https?:\/\/(www\.)?(xvideos\.com|xvideos\d*\.com)\/[^\s]+/i
     const xnxxRegex = /https?:\/\/(www\.)?(xnxx\.com|xnxx\d*\.com)\/[^\s]+/i
 
@@ -490,24 +490,16 @@ export async function before(m, { conn, isOwner }) {
         found = true
         m.react(rwait)
         try {
-            const { downloadCobalt } = await import('../lib/ytHelper.js')
-            let cobaltRes = await downloadCobalt(link)
-            if (cobaltRes) {
-                if (cobaltRes.isPicker) {
-                    for (let url of cobaltRes.items) {
-                        await conn.sendFile(m.chat, url, 'pinterest.png', `✅ *Auto DL: Pinterest*`, m, null, fwc)
-                    }
-                    m.react(done)
-                } else if (fs.existsSync(cobaltRes.filePath)) {
-                    await conn.sendFile(m.chat, cobaltRes.filePath, cobaltRes.title || 'pinterest.mp4', `✅ *Auto DL: Pinterest*`, m, null, fwc)
-                    if (fs.existsSync(cobaltRes.filePath)) fs.unlinkSync(cobaltRes.filePath)
-                    m.react(done)
-                } else {
-                    throw new Error('Nenhum arquivo retornado do Cobalt.')
-                }
+            const { pinterestDownload } = await import('../lib/pinterest.js')
+            const res = await pinterestDownload(link)
+            if (res.type === 'video') {
+                await conn.sendFile(m.chat, res.url, 'pinterest.mp4', `✅ *Auto DL: Pinterest*`, m, null, fwc)
             } else {
-                throw new Error('API do Cobalt offline.')
+                for (let url of res.urls.slice(0, 10)) {
+                    await conn.sendFile(m.chat, url, 'pinterest.jpg', `✅ *Auto DL: Pinterest*`, m, null, fwc)
+                }
             }
+            m.react(done)
         } catch (e) {
             console.error('AutoDL Pinterest Error:', e)
             m.react('❌')

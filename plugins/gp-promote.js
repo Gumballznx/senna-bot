@@ -4,7 +4,7 @@ let handler = async (m, { conn, args, usedPrefix, command, isAdmin, isOwner }) =
     let user = m.mentionedJid[0] || (m.quoted ? m.quoted.sender : null)
     if (!user) throw `✳️ Mencione o membro ou responda a uma mensagem dele\n\n📌 Exemplo: *${usedPrefix + command}* @user`
 
-    let groupMetadata = await conn.groupMetadata(m.chat)
+    let groupMetadata = await (conn.getGroupMetadata ? conn.getGroupMetadata(m.chat) : conn.groupMetadata(m.chat))
     let participant = groupMetadata.participants.find(p => p.id === user)
 
     if (!participant) throw `❎ Esse usuário não está no grupo!`

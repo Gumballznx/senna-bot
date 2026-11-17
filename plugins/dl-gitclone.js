@@ -4,7 +4,7 @@ const regex = /(?:https|git)(?::\/\/|@)github\.com[\/:]([^\/:]+)\/(.+)/i
 let handler = async (m, { conn, args, usedPrefix, command }) => {
 
     if (!args[0])
-        throw `Insira un link GitHub\n\n📌 Exemplo : ${usedPrefix + command} https://github.com/Gumballxnz/senna-bot`
+        throw `Insira un link GitHub\n\n📌 Exemplo : ${usedPrefix + command} https://github.com/Gumballznx/senna-bot`
 
     if (!regex.test(args[0]))
         throw `Insira un link GitHub válido`

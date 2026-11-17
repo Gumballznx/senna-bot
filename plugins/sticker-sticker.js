@@ -17,7 +17,7 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
       let duration = q.msg?.seconds || q.seconds || 0
       if (/video/g.test(mime) && duration > 11) return m.reply('Máximo 10 segundos')
 
-      let img = await q.download?.().catch((err) => {
+      let img = await Promise.resolve(typeof q.download === 'function' ? q.download() : null).catch((err) => {
         console.error('[STICKER Q.DOWNLOAD FAILED]:', err)
         return null
       })

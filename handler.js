@@ -607,6 +607,8 @@ if (m.isGroup && m.sender) {
 }
 
 export async function participantsUpdate({ id, participants, action }) {
+    global.groupMetaCache?.del(id)
+    this._groupMetadataCache?.delete?.(id)
     if (opts['self']) return
     if (global.db.data == null) await loadDatabase()
 
@@ -623,7 +625,7 @@ export async function participantsUpdate({ id, participants, action }) {
             if (!chat.welcome) break
 
             let groupMetadata =
-                await this.groupMetadata(id).catch(_ => null) ||
+                await (this.getGroupMetadata ? this.getGroupMetadata(id) : this.groupMetadata(id)).catch(_ => null) ||
                 (conn.chats[id] || {}).metadata
 
             if (!groupMetadata) return
@@ -707,6 +709,7 @@ export async function groupsUpdate(groupsUpdate) {
     if (opts['self'])
         return
     for (const groupUpdate of groupsUpdate) {
+        if (groupUpdate?.id) { global.groupMetaCache?.del(groupUpdate.id); this._groupMetadataCache?.delete?.(groupUpdate.id) }
         const id = groupUpdate.id
         if (!id) continue
         let chats = global.db.data.chats[id], text = ''
@@ -768,7 +771,7 @@ export async function deleteUpdate(update) {
 ▢ *Contenido* : ${text}
 └────────────
 
-💡 Usa *${m?.prefix || (typeof global.prefix === 'string' ? global.prefix : '.')}off antidelete* para desactivar
+💡 Usa *${typeof global.prefix === 'string' ? global.prefix : '.'}off antidelete* para desactivar
 `.trim()
 
         await this.reply(msg.chat, info, msg, {

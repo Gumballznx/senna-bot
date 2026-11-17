@@ -1,14 +1,14 @@
 <p align="center">
-  <img src="https://raw.githubusercontent.com/Gumballxnz/senna-bot/main/src/fg_logo.jpg" alt="Senna Bot" width="650" style="border-radius: 12px;"/>
+  <img src="https://raw.githubusercontent.com/Gumballznx/senna-bot/main/src/fg_logo.jpg" alt="Senna Bot" width="650" style="border-radius: 12px;"/>
 </p>
 
 # <p align="center">🏎️ Senna Bot — WhatsApp Bot Inteligente & Modular</p>
 
 <p align="center">
-  <img src="https://komarev.com/ghpvc/?username=Gumballxnz&color=brightgreen" alt="Views" />
-  <a href="https://github.com/Gumballxnz"><img title="Author" src="https://img.shields.io/badge/Dono-Gumball-blue?style=for-the-badge&logo=whatsapp"></a>
-  <a href="https://github.com/Gumballxnz/senna-bot/stargazers/"><img title="Stars" src="https://img.shields.io/github/stars/Gumballxnz/senna-bot?style=social"></a>
-  <a href="https://github.com/Gumballxnz/senna-bot/network/members"><img title="Fork" src="https://img.shields.io/github/forks/Gumballxnz/senna-bot?style=social"></a>
+  <img src="https://komarev.com/ghpvc/?username=Gumballznx&color=brightgreen" alt="Views" />
+  <a href="https://github.com/Gumballznx"><img title="Author" src="https://img.shields.io/badge/Dono-Gumball-blue?style=for-the-badge&logo=whatsapp"></a>
+  <a href="https://github.com/Gumballznx/senna-bot/stargazers/"><img title="Stars" src="https://img.shields.io/github/stars/Gumballznx/senna-bot?style=social"></a>
+  <a href="https://github.com/Gumballznx/senna-bot/network/members"><img title="Fork" src="https://img.shields.io/github/forks/Gumballznx/senna-bot?style=social"></a>
 </p>
 
 O **Senna Bot** é um assistente automatizado e modular para WhatsApp extremamente rápido e repleto de recursos. Ele foi desenvolvido em **Node.js** utilizando a biblioteca **WhiskeySockets Baileys**, sendo ideal tanto para uso pessoal em chats privados quanto para a administração completa de grupos de grande porte.
@@ -24,7 +24,7 @@ Você pode iniciar e configurar o Senna Bot instantaneamente em qualquer pasta s
 npx senna-bot init
 # Alternativas equivalentes:
 # npx @gumballwotersan/senna-bot init
-# npx github:Gumballxnz/senna-bot init
+# npx github:Gumballznx/senna-bot init
 
 # 2. Conectar com o WhatsApp via Pairing Code
 npx senna-bot pair
@@ -90,7 +90,7 @@ pkg upgrade -y && pkg update -y
 pkg install git nodejs ffmpeg imagemagick -y
 
 # 3. Baixar o projeto do GitHub
-git clone https://github.com/Gumballxnz/senna-bot
+git clone https://github.com/Gumballznx/senna-bot
 
 # 4. Entrar na pasta do projeto
 cd senna-bot
@@ -160,4 +160,4 @@ Propriedade intelectual de **Gumball** (Copyright © 2026). Consulte o arquivo `
 
 ---
 
-*Criado e mantido com ⚡ por **[Gumball](https://github.com/Gumballxnz)**.*
+*Criado e mantido com ⚡ por **[Gumball](https://github.com/Gumballznx)**.*
