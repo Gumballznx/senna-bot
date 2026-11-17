@@ -26,6 +26,23 @@ export async function handler(chatUpdate) {
     let m = chatUpdate.messages[chatUpdate.messages.length - 1]
     if (!m)
         return
+
+    // Ignora a mesma mensagem entregue de novo pelo WhatsApp (acontece quando o bot fica ocupado
+    // com um download grande): sem isso o autodl baixava e enviava o mesmo arquivo duas vezes.
+    // A chave inclui a conexão, então cada sub-bot continua tratando as suas mensagens.
+    if (m.key?.id && m.key?.remoteJid) {
+        global.processedMsgIds ||= new Map()
+        const dedupKey = `${this.user?.id || ''}|${m.key.remoteJid}|${m.key.id}`
+        const now = Date.now()
+        if (global.processedMsgIds.has(dedupKey)) return
+        global.processedMsgIds.set(dedupKey, now)
+        if (global.processedMsgIds.size > 5000) {
+            for (const [k, t] of global.processedMsgIds) {
+                if (now - t > 30 * 60 * 1000 || global.processedMsgIds.size > 4000) global.processedMsgIds.delete(k)
+                else break
+            }
+        }
+    }
     if (global.db.data == null)
         await global.loadDatabase()
 
