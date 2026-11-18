@@ -35,6 +35,7 @@ export async function before(m, { conn, isOwner }) {
     const youtubeRegex = /https?:\/\/(www\.|m\.)?(youtube\.com|youtu\.be)\/[^\s]*/i
     const twitterRegex = /https?:\/\/(www\.)?(twitter\.com|x\.com)\/[^\s]+/i
     const pinterestRegex = /https?:\/\/([a-z]+\.)?(pinterest\.[a-z.]+\/pin|pin\.it)\/[^\s]*/i
+    const twitchRegex = /https?:\/\/(www\.|clips\.|m\.)?twitch\.tv\/[^\s]+/i
     const xvideosRegex = /https?:\/\/(www\.)?(xvideos\.com|xvideos\d*\.com)\/[^\s]+/i
     const xnxxRegex = /https?:\/\/(www\.)?(xnxx\.com|xnxx\d*\.com)\/[^\s]+/i
 
@@ -494,6 +495,53 @@ export async function before(m, { conn, isOwner }) {
             console.error('AutoDL Pinterest Error:', e)
             m.react('❌')
             m.reply(`❎ Erro ao baixar Pinterest: ${e.message}`)
+        }
+    }
+
+    if (!found && twitchRegex.test(text)) {
+        let link = text.match(twitchRegex)[0]
+        found = true
+        m.react(rwait)
+        const TEMP_DIR = path.join(process.cwd(), 'tmp')
+        if (!fs.existsSync(TEMP_DIR)) fs.mkdirSync(TEMP_DIR, { recursive: true })
+        const rawPath = path.join(TEMP_DIR, `twitch_raw_${Date.now()}.mp4`)
+        const finalPath = path.join(TEMP_DIR, `twitch_${Date.now()}.mp4`)
+        try {
+            let success = false
+            try {
+                const { downloadCobalt } = await import('../lib/ytHelper.js')
+                const cobaltRes = await downloadCobalt(link)
+                if (cobaltRes?.filePath && fs.existsSync(cobaltRes.filePath)) {
+                    await sendVideoSmart(conn, m.chat, cobaltRes.filePath, cobaltRes.title || 'twitch.mp4', `✅ *Auto DL: Twitch*`, m)
+                    if (fs.existsSync(cobaltRes.filePath)) try { fs.unlinkSync(cobaltRes.filePath) } catch (_) {}
+                    success = true
+                }
+            } catch (errCobalt) {
+                console.warn('[AutoDL Twitch] Cobalt falhou, tentando yt-dlp:', errCobalt.message)
+            }
+
+            if (!success) {
+                await execAsync(`yt-dlp -f "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best" --merge-output-format mp4 -o "${rawPath}" "${link}"`, { timeout: 180000 })
+                if (fs.existsSync(rawPath)) {
+                    await execAsync(`ffmpeg -i "${rawPath}" -c:v copy -c:a aac -b:a 128k -movflags +faststart -y "${finalPath}"`, { timeout: 300000 })
+                    if (fs.existsSync(rawPath)) try { fs.unlinkSync(rawPath) } catch (_) {}
+                    if (fs.existsSync(finalPath)) {
+                        await sendVideoSmart(conn, m.chat, finalPath, 'twitch.mp4', `✅ *Auto DL: Twitch*`, m)
+                        if (fs.existsSync(finalPath)) try { fs.unlinkSync(finalPath) } catch (_) {}
+                        success = true
+                    }
+                }
+            }
+
+            if (!success) throw new Error('Falha ao baixar mídia da Twitch.')
+            m.react(done)
+        } catch (e) {
+            console.error('AutoDL Twitch Error:', e.message)
+            m.react('❌')
+            m.reply(`❎ Erro ao baixar Twitch: ${e.message}`)
+        } finally {
+            if (fs.existsSync(rawPath)) try { fs.unlinkSync(rawPath) } catch (_) {}
+            if (fs.existsSync(finalPath)) try { fs.unlinkSync(finalPath) } catch (_) {}
         }
     }
 
