@@ -17,7 +17,6 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
     const TEMP_DIR = path.join(process.cwd(), 'tmp')
     if (!fs.existsSync(TEMP_DIR)) fs.mkdirSync(TEMP_DIR, { recursive: true })
     const rawPath = path.join(TEMP_DIR, `twitch_raw_${Date.now()}.mp4`)
-    const finalPath = path.join(TEMP_DIR, `twitch_${Date.now()}.mp4`)
 
     try {
         let success = false
@@ -37,14 +36,10 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
 
         // 2. Fallback via yt-dlp
         if (!success) {
-            await execAsync(`yt-dlp -f "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best" --merge-output-format mp4 -o "${rawPath}" "${url}"`, { timeout: 180000 })
+            await execAsync(`yt-dlp -f "bestvideo[height<=1080]+bestaudio/best[height<=1080]/best" --merge-output-format mp4 -o "${rawPath}" "${url}"`, { timeout: 180000 })
             if (fs.existsSync(rawPath)) {
-                await execAsync(`ffmpeg -i "${rawPath}" -c:v copy -c:a aac -b:a 128k -movflags +faststart -y "${finalPath}"`, { timeout: 300000 })
-                if (fs.existsSync(rawPath)) try { fs.unlinkSync(rawPath) } catch (_) {}
-                if (fs.existsSync(finalPath)) {
-                    await sendVideoSmart(conn, m.chat, finalPath, 'twitch.mp4', `✅ *Twitch*`, m)
-                    success = true
-                }
+                await sendVideoSmart(conn, m.chat, rawPath, 'twitch.mp4', `✅ *Twitch*`, m)
+                success = true
             }
         }
 
@@ -56,7 +51,6 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
         m.reply(`❎ Erro ao baixar da Twitch: ${error.message || 'Falha no download'}`)
     } finally {
         if (fs.existsSync(rawPath)) try { fs.unlinkSync(rawPath) } catch (_) {}
-        if (fs.existsSync(finalPath)) try { fs.unlinkSync(finalPath) } catch (_) {}
     }
 }
 
