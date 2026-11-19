@@ -8,6 +8,24 @@ import { promisify } from 'util'
 
 const execAsync = promisify(exec)
 
+const processedLinks = new Map()
+const DEDUP_TTL = 3 * 60 * 1000 // 3 minutos anti-duplicados por chat
+
+function isRecent(key) {
+    const time = processedLinks.get(key)
+    return !!(time && (Date.now() - time < DEDUP_TTL))
+}
+
+function markRecent(key) {
+    processedLinks.set(key, Date.now())
+    if (processedLinks.size > 500) {
+        const now = Date.now()
+        for (const [k, v] of processedLinks.entries()) {
+            if (now - v > DEDUP_TTL) processedLinks.delete(k)
+        }
+    }
+}
+
 export async function before(m, { conn, isOwner }) {
     if (m.isBaileys || m.fromMe || !m.text) return false
     let chat = global.db.data.chats[m.chat]
@@ -66,6 +84,9 @@ export async function before(m, { conn, isOwner }) {
                 if (resp?.url) link = resp.url
             } catch (e) {}
         }
+        const dedupKey = `${m.chat}:${link}`
+        if (isRecent(dedupKey)) return false
+        markRecent(dedupKey)
         found = true
         m.react(rwait)
         try {
@@ -86,8 +107,13 @@ export async function before(m, { conn, isOwner }) {
                 }
 
                 if (data && data.result && data.result.images) {
-                    for (let img of data.result.images) {
+                    const images = data.result.images.slice(0, 5)
+                    for (let img of images) {
                         await conn.sendFile(m.chat, img, 'tiktok.png', '', m, null, fwc)
+                        await new Promise(resolve => setTimeout(resolve, 1200))
+                    }
+                    if (data.result.images.length > 5) {
+                        await conn.reply(m.chat, `ℹ️ Mostrando 5 de ${data.result.images.length} fotos do carrossel para evitar flood.`, m)
                     }
                     success = true
                     m.react(done)
@@ -134,6 +160,9 @@ export async function before(m, { conn, isOwner }) {
     if (!found && instagramRegex.test(text)) {
         // Remove parâmetros de rastreio (?dlrf=, ?igsh=, ?utm_...) que atrapalham alguns extratores
         let link = text.match(instagramRegex)[0].split('?')[0]
+        const dedupKey = `${m.chat}:${link}`
+        if (isRecent(dedupKey)) return false
+        markRecent(dedupKey)
         found = true
         m.react(rwait)
         try {
@@ -163,7 +192,9 @@ export async function before(m, { conn, isOwner }) {
             if (mediaList.length > 0) {
                 const axios = (await import('axios')).default
                 const sharp = (await import('sharp')).default
-                for (let mediaUrl of mediaList) {
+                const maxMedia = 5
+                const mediaToSend = mediaList.slice(0, maxMedia)
+                for (let mediaUrl of mediaToSend) {
                     try {
                         const res = await axios.get(mediaUrl, {
                             responseType: 'arraybuffer',
@@ -183,9 +214,13 @@ export async function before(m, { conn, isOwner }) {
                             await conn.sendFile(m.chat, buffer, 'instagram.mp4', `✅ *Auto DL: Instagram*`, m, null, fwc)
                         }
                         success = true
+                        await new Promise(resolve => setTimeout(resolve, 1200))
                     } catch (dlErr) {
                         console.error('❌ [AutoDL IG] Erro ao baixar buffer:', dlErr.message)
                     }
+                }
+                if (mediaList.length > maxMedia && success) {
+                    await conn.reply(m.chat, `ℹ️ Mostrando 5 de ${mediaList.length} mídias deste álbum para evitar flood.`, m)
                 }
                 if (success) {
                     m.react(done)
@@ -274,6 +309,9 @@ export async function before(m, { conn, isOwner }) {
 
     if (!found && facebookRegex.test(text)) {
         let link = text.match(facebookRegex)[0]
+        const dedupKey = `${m.chat}:${link}`
+        if (isRecent(dedupKey)) return false
+        markRecent(dedupKey)
         found = true
         m.react(rwait)
         const TEMP_DIR = path.join(process.cwd(), 'tmp')
@@ -298,6 +336,9 @@ export async function before(m, { conn, isOwner }) {
     if (!found && twitterRegex.test(text)) {
         if (!checkNsfwAccess()) return true
         let link = text.match(twitterRegex)[0]
+        const dedupKey = `${m.chat}:${link}`
+        if (isRecent(dedupKey)) return false
+        markRecent(dedupKey)
         found = true
         m.react(rwait)
         try {
@@ -411,6 +452,9 @@ export async function before(m, { conn, isOwner }) {
 
     if (!found && mediafireRegex.test(text)) {
         let link = text.match(mediafireRegex)[0]
+        const dedupKey = `${m.chat}:${link}`
+        if (isRecent(dedupKey)) return false
+        markRecent(dedupKey)
         found = true
         m.react(rwait)
         try {
@@ -431,6 +475,9 @@ export async function before(m, { conn, isOwner }) {
 
     if (!found && megaRegex.test(text)) {
         let link = text.match(megaRegex)[0]
+        const dedupKey = `${m.chat}:${link}`
+        if (isRecent(dedupKey)) return false
+        markRecent(dedupKey)
         found = true
         m.react(rwait)
         try {
@@ -448,6 +495,9 @@ export async function before(m, { conn, isOwner }) {
 
     if (!found && youtubeRegex.test(text)) {
         let link = text.match(youtubeRegex)[0]
+        const dedupKey = `${m.chat}:${link}`
+        if (isRecent(dedupKey)) return false
+        markRecent(dedupKey)
         found = true
         m.react(rwait)
         try {
@@ -478,6 +528,9 @@ export async function before(m, { conn, isOwner }) {
 
     if (!found && pinterestRegex.test(text)) {
         let link = text.match(pinterestRegex)[0]
+        const dedupKey = `${m.chat}:${link}`
+        if (isRecent(dedupKey)) return false
+        markRecent(dedupKey)
         found = true
         m.react(rwait)
         try {
@@ -486,8 +539,9 @@ export async function before(m, { conn, isOwner }) {
             if (res.type === 'video') {
                 await conn.sendFile(m.chat, res.url, 'pinterest.mp4', `✅ *Auto DL: Pinterest*`, m, null, fwc)
             } else {
-                for (let url of res.urls.slice(0, 10)) {
+                for (let url of (res.urls || []).slice(0, 5)) {
                     await conn.sendFile(m.chat, url, 'pinterest.jpg', `✅ *Auto DL: Pinterest*`, m, null, fwc)
+                    await new Promise(r => setTimeout(r, 1200))
                 }
             }
             m.react(done)
@@ -500,6 +554,9 @@ export async function before(m, { conn, isOwner }) {
 
     if (!found && twitchRegex.test(text)) {
         let link = text.match(twitchRegex)[0]
+        const dedupKey = `${m.chat}:${link}`
+        if (isRecent(dedupKey)) return false
+        markRecent(dedupKey)
         found = true
         m.react(rwait)
         const TEMP_DIR = path.join(process.cwd(), 'tmp')
