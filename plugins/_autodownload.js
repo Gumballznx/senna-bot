@@ -8,24 +8,6 @@ import { promisify } from 'util'
 
 const execAsync = promisify(exec)
 
-const processedLinks = new Map()
-const DEDUP_TTL = 3 * 60 * 1000 // 3 minutos anti-duplicados por chat
-
-function isRecent(key) {
-    const time = processedLinks.get(key)
-    return !!(time && (Date.now() - time < DEDUP_TTL))
-}
-
-function markRecent(key) {
-    processedLinks.set(key, Date.now())
-    if (processedLinks.size > 500) {
-        const now = Date.now()
-        for (const [k, v] of processedLinks.entries()) {
-            if (now - v > DEDUP_TTL) processedLinks.delete(k)
-        }
-    }
-}
-
 export async function before(m, { conn, isOwner }) {
     if (m.isBaileys || m.fromMe || !m.text) return false
     let chat = global.db.data.chats[m.chat]
@@ -84,9 +66,6 @@ export async function before(m, { conn, isOwner }) {
                 if (resp?.url) link = resp.url
             } catch (e) {}
         }
-        const dedupKey = `${m.chat}:${link}`
-        if (isRecent(dedupKey)) return false
-        markRecent(dedupKey)
         found = true
         m.react(rwait)
         try {
@@ -160,9 +139,6 @@ export async function before(m, { conn, isOwner }) {
     if (!found && instagramRegex.test(text)) {
         // Remove parâmetros de rastreio (?dlrf=, ?igsh=, ?utm_...) que atrapalham alguns extratores
         let link = text.match(instagramRegex)[0].split('?')[0]
-        const dedupKey = `${m.chat}:${link}`
-        if (isRecent(dedupKey)) return false
-        markRecent(dedupKey)
         found = true
         m.react(rwait)
         try {
@@ -309,9 +285,6 @@ export async function before(m, { conn, isOwner }) {
 
     if (!found && facebookRegex.test(text)) {
         let link = text.match(facebookRegex)[0]
-        const dedupKey = `${m.chat}:${link}`
-        if (isRecent(dedupKey)) return false
-        markRecent(dedupKey)
         found = true
         m.react(rwait)
         const TEMP_DIR = path.join(process.cwd(), 'tmp')
@@ -336,9 +309,6 @@ export async function before(m, { conn, isOwner }) {
     if (!found && twitterRegex.test(text)) {
         if (!checkNsfwAccess()) return true
         let link = text.match(twitterRegex)[0]
-        const dedupKey = `${m.chat}:${link}`
-        if (isRecent(dedupKey)) return false
-        markRecent(dedupKey)
         found = true
         m.react(rwait)
         try {
@@ -452,9 +422,6 @@ export async function before(m, { conn, isOwner }) {
 
     if (!found && mediafireRegex.test(text)) {
         let link = text.match(mediafireRegex)[0]
-        const dedupKey = `${m.chat}:${link}`
-        if (isRecent(dedupKey)) return false
-        markRecent(dedupKey)
         found = true
         m.react(rwait)
         try {
@@ -475,9 +442,6 @@ export async function before(m, { conn, isOwner }) {
 
     if (!found && megaRegex.test(text)) {
         let link = text.match(megaRegex)[0]
-        const dedupKey = `${m.chat}:${link}`
-        if (isRecent(dedupKey)) return false
-        markRecent(dedupKey)
         found = true
         m.react(rwait)
         try {
@@ -495,9 +459,6 @@ export async function before(m, { conn, isOwner }) {
 
     if (!found && youtubeRegex.test(text)) {
         let link = text.match(youtubeRegex)[0]
-        const dedupKey = `${m.chat}:${link}`
-        if (isRecent(dedupKey)) return false
-        markRecent(dedupKey)
         found = true
         m.react(rwait)
         try {
@@ -528,9 +489,6 @@ export async function before(m, { conn, isOwner }) {
 
     if (!found && pinterestRegex.test(text)) {
         let link = text.match(pinterestRegex)[0]
-        const dedupKey = `${m.chat}:${link}`
-        if (isRecent(dedupKey)) return false
-        markRecent(dedupKey)
         found = true
         m.react(rwait)
         try {
@@ -554,9 +512,6 @@ export async function before(m, { conn, isOwner }) {
 
     if (!found && twitchRegex.test(text)) {
         let link = text.match(twitchRegex)[0]
-        const dedupKey = `${m.chat}:${link}`
-        if (isRecent(dedupKey)) return false
-        markRecent(dedupKey)
         found = true
         m.react(rwait)
         const TEMP_DIR = path.join(process.cwd(), 'tmp')
