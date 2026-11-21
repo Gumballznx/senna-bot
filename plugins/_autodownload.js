@@ -445,11 +445,9 @@ export async function before(m, { conn, isOwner }) {
         found = true
         m.react(rwait)
         try {
-            let data = await fg.mega(link)
-            if (data.download) {
-                await conn.sendFile(m.chat, data.download, data.filename, `✅ *Auto DL: MEGA*`, m, null, { asDocument: true })
-                m.react(done)
-            }
+            const { megaSend } = await import('../lib/mega.js')
+            await megaSend(conn, m, link, `✅ *Auto DL: MEGA*`)
+            m.react(done)
         } catch (e) {
             console.error('AutoDL MEGA Error:', e)
             m.react('❌')
