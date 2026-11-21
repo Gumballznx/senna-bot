@@ -33,6 +33,7 @@ export async function before(m, { conn, isOwner }) {
     const mediafireRegex = /https?:\/\/(www\.)?mediafire\.com\/file\/[^\s]*/i
     const megaRegex = /https?:\/\/mega\.nz\/file\/[^\s]*/i
     const driveRegex = /https?:\/\/(drive\.google\.com\/(file\/d\/|open\?id=|uc\?[^\s]*id=)|docs\.google\.com\/(document|spreadsheets|presentation)\/d\/)[^\s]*/i
+    const driveFolderRegex = /https?:\/\/drive\.google\.com\/(drive\/(u\/\d+\/)?folders\/|folderview\?id=)[^\s]*/i
     const youtubeRegex = /https?:\/\/(www\.|m\.)?(youtube\.com|youtu\.be)\/[^\s]*/i
     const twitterRegex = /https?:\/\/(www\.)?(twitter\.com|x\.com)\/[^\s]+/i
     const pinterestRegex = /https?:\/\/([a-z]+\.)?(pinterest\.[a-z.]+\/pin|pin\.it)\/[^\s]*/i
@@ -453,6 +454,21 @@ export async function before(m, { conn, isOwner }) {
             console.error('AutoDL MEGA Error:', e)
             m.react('❌')
             m.reply(`❎ Erro ao baixar MEGA: ${e.message}`)
+        }
+    }
+
+    if (!found && driveFolderRegex.test(text)) {
+        let link = text.match(driveFolderRegex)[0]
+        found = true
+        m.react(rwait)
+        try {
+            const { driveFolderSend } = await import('../lib/gdrive.js')
+            await driveFolderSend(conn, m, link, `✅ *Auto DL: Google Drive*`)
+            m.react(done)
+        } catch (e) {
+            console.error('AutoDL Drive (pasta) Error:', e)
+            m.react('❌')
+            m.reply(`❎ Erro ao baixar a pasta do Google Drive: ${e.message}`)
         }
     }
 
