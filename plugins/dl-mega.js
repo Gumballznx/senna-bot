@@ -1,10 +1,11 @@
-import { megaSend } from '../lib/mega.js'
+import { megaSend, megaFolderSend, isMegaFolder } from '../lib/mega.js'
 
 let handler = async (m, { conn, args }) => {
     if (!args[0]) throw `✳️ Insira um link do MEGA`
     m.react(rwait)
     try {
-        await megaSend(conn, m, args[0])
+        if (isMegaFolder(args[0])) await megaFolderSend(conn, m, args[0])
+        else await megaSend(conn, m, args[0])
         m.react(done)
     } catch (e) {
         console.error('[mega] erro:', e)

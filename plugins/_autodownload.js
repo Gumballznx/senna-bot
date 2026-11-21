@@ -30,8 +30,10 @@ export async function before(m, { conn, isOwner }) {
     const tiktokRegex = /https?:\/\/(www\.|v[mt]\.|vt\.)?tiktok\.com\/[^\s]*|https?:\/\/(www\.)?tt\.site\/[^\s]*/i
     const facebookRegex = /https?:\/\/(www\.|web\.|m\.)?(facebook\.com|fb\.watch|fb\.com)\/[^\s]*/i
     const instagramRegex = /https?:\/\/(www\.)?instagram\.com\/(p|reel|tv|stories)\/[^\s]+|https?:\/\/instagr\.am\/[^\s]+/i
-    const mediafireRegex = /https?:\/\/(www\.)?mediafire\.com\/file\/[^\s]*/i
+    const mediafireRegex = /https?:\/\/(www\.)?mediafire\.com\/(file|view|download)\/[^\s]*/i
+    const mediafireFolderRegex = /https?:\/\/(www\.)?mediafire\.com\/folder\/[^\s]*/i
     const megaRegex = /https?:\/\/mega\.nz\/file\/[^\s]*/i
+    const megaFolderRegex = /https?:\/\/mega\.nz\/folder\/[^\s]*/i
     const driveRegex = /https?:\/\/(drive\.google\.com\/(file\/d\/|open\?id=|uc\?[^\s]*id=)|docs\.google\.com\/(document|spreadsheets|presentation)\/d\/)[^\s]*/i
     const driveFolderRegex = /https?:\/\/drive\.google\.com\/(drive\/(u\/\d+\/)?folders\/|folderview\?id=)[^\s]*/i
     const youtubeRegex = /https?:\/\/(www\.|m\.)?(youtube\.com|youtu\.be)\/[^\s]*/i
@@ -422,23 +424,48 @@ export async function before(m, { conn, isOwner }) {
         }
     }
 
+    if (!found && mediafireFolderRegex.test(text)) {
+        let link = text.match(mediafireFolderRegex)[0]
+        found = true
+        m.react(rwait)
+        try {
+            const { mediafireFolderSend } = await import('../lib/mediafire.js')
+            await mediafireFolderSend(conn, m, link, `✅ *Auto DL: MediaFire*`)
+            m.react(done)
+        } catch (e) {
+            console.error('AutoDL MediaFire (pasta) Error:', e)
+            m.react('❌')
+            m.reply(`❎ Erro ao baixar a pasta do MediaFire: ${e.message}`)
+        }
+    }
+
     if (!found && mediafireRegex.test(text)) {
         let link = text.match(mediafireRegex)[0]
         found = true
         m.react(rwait)
         try {
-            let data = await fg.mediafire(link)
-            if (data.url) {
-                let size = parseInt(data.size)
-                let prefix = typeof global.prefix === 'string' ? global.prefix : '.'
-                if (size > 1024 && data.size.includes('MB') && !isOwner) return m.reply(`✳️ Arquivo muito grande para AutoDL (Max 1GB). Use o comando ${prefix}mediafire para limites de até 3GB.`)
-                await conn.sendFile(m.chat, data.url, data.filename, `✅ *Auto DL: Mediafire*`, m, null, { asDocument: true })
-                m.react(done)
-            }
+            const { mediafireSend } = await import('../lib/mediafire.js')
+            await mediafireSend(conn, m, link, `✅ *Auto DL: Mediafire*`)
+            m.react(done)
         } catch (e) {
             console.error('AutoDL Mediafire Error:', e)
             m.react('❌')
             m.reply(`❎ Erro ao baixar Mediafire: ${e.message}`)
+        }
+    }
+
+    if (!found && megaFolderRegex.test(text)) {
+        let link = text.match(megaFolderRegex)[0]
+        found = true
+        m.react(rwait)
+        try {
+            const { megaFolderSend } = await import('../lib/mega.js')
+            await megaFolderSend(conn, m, link, `✅ *Auto DL: MEGA*`)
+            m.react(done)
+        } catch (e) {
+            console.error('AutoDL MEGA (pasta) Error:', e)
+            m.react('❌')
+            m.reply(`❎ Erro ao baixar a pasta do MEGA: ${e.message}`)
         }
     }
 
