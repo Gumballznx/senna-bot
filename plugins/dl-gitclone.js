@@ -1,37 +1,19 @@
-import fetch from 'node-fetch'
-const regex = /(?:https|git)(?::\/\/|@)github\.com[\/:]([^\/:]+)\/(.+)/i
+import { githubSend } from '../lib/github.js'
+import { senaIO } from '../lib/cloudio.js'
 
+// Repositório inteiro (zip), branch/tag, subpasta, arquivo (/blob/) ou arquivo de release.
 let handler = async (m, { conn, args, usedPrefix, command }) => {
-
     if (!args[0])
-        throw `Insira un link GitHub\n\n📌 Exemplo : ${usedPrefix + command} https://github.com/Gumballznx/senna-bot`
-
-    if (!regex.test(args[0]))
-        throw `Insira un link GitHub válido`
-
-    let [, user, repo] = args[0].match(regex)
-    repo = repo.replace(/\.git$/, '')
-
-    let api = `https://api.github.com/repos/${user}/${repo}`
-    let res = await fetch(api)
-    if (!res.ok) throw 'Repositorio no encontrado'
-    let json = await res.json()
-
-    let caption = `
-⭐Stars: ${json.stargazers_count}
-🍴 Forks: ${json.forks_count}
-
-📅 Creado: ${json.created_at.slice(0,10)}
-🔄 Actualizado: ${json.updated_at.slice(0,10)}
-
-👤 Owner: ${json.owner.login}
-🔗 Perfil: ${json.owner.html_url}
-`.trim()
-
-    let url = `https://codeload.github.com/${user}/${repo}/zip/refs/heads/${json.default_branch}`
-    let filename = `${user}-${repo}.zip`
-
-    await conn.sendFile(m.chat, url, filename, caption, m, false, { mimetype: 'application/zip', asDocument: true })
+        throw `Insira um link do GitHub\n\n📌 Exemplos:\n*${usedPrefix + command}* https://github.com/Gumballznx/senna-bot\n*${usedPrefix + command}* https://github.com/Gumballznx/senna-bot/tree/main/plugins`
+    m.react(rwait)
+    try {
+        await githubSend(senaIO(conn, m), args[0])
+        m.react(done)
+    } catch (e) {
+        console.error('[gitclone] erro:', e)
+        m.react('❌')
+        m.reply(`❎ Erro ao baixar do GitHub: ${e.message}`)
+    }
 }
 handler.help = ['gitclone <url>']
 handler.tags = ['dl']

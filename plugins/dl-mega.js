@@ -1,11 +1,13 @@
 import { megaSend, megaFolderSend, isMegaFolder } from '../lib/mega.js'
+import { senaIO } from '../lib/cloudio.js'
 
 let handler = async (m, { conn, args }) => {
-    if (!args[0]) throw `✳️ Insira um link do MEGA`
+    if (!args[0]) throw `✳️ Insira um link do MEGA (arquivo ou pasta)`
     m.react(rwait)
     try {
-        if (isMegaFolder(args[0])) await megaFolderSend(conn, m, args[0])
-        else await megaSend(conn, m, args[0])
+        const io = senaIO(conn, m)
+        if (isMegaFolder(args[0])) await megaFolderSend(io, args[0])
+        else await megaSend(io, args[0])
         m.react(done)
     } catch (e) {
         console.error('[mega] erro:', e)
