@@ -1,9 +1,9 @@
 import { downloadContentFromMessage } from '@whiskeysockets/baileys'
 import {
   patchAudioStickerProto,
-  probeMediaBuffer,
   buildStickerWebp,
   buildStickerAudioOgg,
+  prepareVideoStickerAssets,
   sendAudioSticker,
   setPendingAudioSticker,
   getPendingAudioSticker,
@@ -106,12 +106,12 @@ let handler = async (m, { conn, text, usedPrefix, command }) => {
   try {
     if (target.kind === 'video') {
       if (pending?.type === 'audio') {
-        const webpData = await buildStickerWebp(buffer, {
-          isVideo: true,
+        const { webpData } = await prepareVideoStickerAssets(buffer, {
           packname: parsed.packname,
           author: parsed.author,
           startSeconds: parsed.startSeconds,
-          maxDuration: 5
+          maxVideoSeconds: 5,
+          extractAudio: false
         })
         await sendAudioSticker(conn, chatId, {
           preConvertedWebp: webpData,
@@ -123,32 +123,27 @@ let handler = async (m, { conn, text, usedPrefix, command }) => {
         return
       }
 
-      const probe = await probeMediaBuffer(buffer, 'mp4')
-      const webpData = await buildStickerWebp(buffer, {
-        isVideo: true,
+      const assets = await prepareVideoStickerAssets(buffer, {
         packname: parsed.packname,
         author: parsed.author,
         startSeconds: parsed.startSeconds,
-        maxDuration: 5
+        endSeconds: parsed.endSeconds,
+        maxVideoSeconds: 5,
+        maxAudioSeconds: 5,
+        extractAudio: true
       })
 
-      if (probe.hasAudio) {
-        const audioData = await buildStickerAudioOgg(buffer, {
-          startSeconds: parsed.startSeconds,
-          endSeconds: parsed.endSeconds,
-          maxSeconds: 5,
-          extHint: 'mp4'
-        })
+      if (assets.hasAudio) {
         await sendAudioSticker(conn, chatId, {
-          preConvertedWebp: webpData,
-          preConvertedAudio: audioData,
+          preConvertedWebp: assets.webpData,
+          preConvertedAudio: assets.audioData,
           quoted: m
         })
         if (typeof m.react === 'function') m.react('✅')
         return
       }
 
-      setPendingAudioSticker(chatId, userId, { type: 'sticker', data: webpData })
+      setPendingAudioSticker(chatId, userId, { type: 'sticker', data: assets.webpData })
       if (typeof m.react === 'function') m.react('🎵')
       return m.reply(`✅ Vídeo convertido para figurinha (sem áudio detectado)!\n\nAgora responda a um *áudio* (até 10s) com *${usedPrefix + command}* para finalizar.`)
     }
