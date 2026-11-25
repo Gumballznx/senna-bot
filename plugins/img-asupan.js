@@ -43,19 +43,25 @@ async function withTimeout(timeoutMs, fn) {
 }
 
 /**
- * Baixa um vídeo com timeout e valida tamanho e tipo real (MIME de vídeo).
+ * Baixa um vídeo com timeout para conexão/cabeçalhos e transferência do corpo,
+ * validando tamanho e tipo real (MIME de vídeo).
  */
-async function downloadVideoBuffer(url, timeoutMs = 10000) {
-    return withTimeout(timeoutMs, async (signal) => {
+async function downloadVideoBuffer(url, headerTimeoutMs = 4500, bodyTimeoutMs = 12000) {
+    const controller = new AbortController()
+    let timer = setTimeout(() => controller.abort(), headerTimeoutMs)
+    try {
         const res = await fetch(url, {
             headers: { 'User-Agent': UA },
             redirect: 'follow',
-            signal
+            signal: controller.signal
         })
         if (!res.ok) throw new Error(`HTTP ${res.status}`)
 
         const contentLength = Number(res.headers.get('content-length') || 0)
         if (contentLength > MAX_VIDEO_BYTES) throw new Error(`Vídeo muito grande (${contentLength} bytes)`)
+
+        clearTimeout(timer)
+        timer = setTimeout(() => controller.abort(), bodyTimeoutMs)
 
         const buffer = Buffer.from(await res.arrayBuffer())
         if (buffer.length < MIN_VIDEO_BYTES || buffer.length > MAX_VIDEO_BYTES) {
@@ -67,12 +73,14 @@ async function downloadVideoBuffer(url, timeoutMs = 10000) {
             throw new Error(`Tipo inválido: ${type?.mime || 'desconhecido'}`)
         }
         return buffer
-    })
+    } finally {
+        clearTimeout(timer)
+    }
 }
 
 async function fetchJsonList(url) {
     try {
-        return await withTimeout(8000, async (signal) => {
+        return await withTimeout(6000, async (signal) => {
             const res = await fetch(url, { signal })
             if (!res.ok) return []
             const data = await res.json()
@@ -99,10 +107,57 @@ async function getAsupanLists() {
     return listCache
 }
 
-async function tryUrls(urls, maxTries, timeoutMs) {
+/**
+ * Sonda até `batchSize` URLs em paralelo via HEAD e devolve a primeira
+ * que responder com status 200 e MIME de vídeo dentro do limite de tamanho.
+ */
+async function pickHealthyUrl(urls, batchSize = 4, timeoutMs = 3000) {
+    const candidates = pickShuffled(urls, batchSize)
+    if (!candidates.length) return null
+
+    const controller = new AbortController()
+    const timer = setTimeout(() => controller.abort(), timeoutMs)
+    try {
+        const winner = await Promise.any(candidates.map(async (url) => {
+            try {
+                const res = await fetch(url, { method: 'HEAD', redirect: 'follow', signal: controller.signal })
+                const ct = res.headers.get('content-type') || ''
+                const len = Number(res.headers.get('content-length') || 0)
+                if (!res.ok || !ct.startsWith('video/') || (len && (len < MIN_VIDEO_BYTES || len > MAX_VIDEO_BYTES))) {
+                    throw new Error(`HEAD ${res.status}`)
+                }
+                return url
+            } catch (err) {
+                if (!controller.signal.aborted) markFailed(url)
+                throw err
+            }
+        }))
+        controller.abort()
+        return winner
+    } catch {
+        return null
+    } finally {
+        clearTimeout(timer)
+    }
+}
+
+async function fetchFromPool(urls) {
+    for (let round = 0; round < 2; round++) {
+        const winner = await pickHealthyUrl(urls, 4, 3000)
+        if (!winner) continue
+        try {
+            return await downloadVideoBuffer(winner, 4500, 12000)
+        } catch {
+            markFailed(winner)
+        }
+    }
+    return null
+}
+
+async function tryUrls(urls, maxTries) {
     for (const url of pickShuffled(urls, maxTries)) {
         try {
-            return await downloadVideoBuffer(url, timeoutMs)
+            return await downloadVideoBuffer(url, 4500, 12000)
         } catch {
             markFailed(url)
         }
@@ -112,7 +167,7 @@ async function tryUrls(urls, maxTries, timeoutMs) {
 
 async function fetchFromTikwm() {
     try {
-        const urls = await withTimeout(8000, async (signal) => {
+        const urls = await withTimeout(6000, async (signal) => {
             const res = await fetch('https://www.tikwm.com/api/feed/list?region=BR&count=15', {
                 headers: { 'User-Agent': UA },
                 signal
@@ -123,7 +178,7 @@ async function fetchFromTikwm() {
                 .filter(v => v?.play && (!v.duration || v.duration <= 60))
                 .map(v => v.play)
         })
-        return await tryUrls(urls, 2, 12000)
+        return await tryUrls(urls, 2)
     } catch {
         return null
     }
@@ -132,7 +187,7 @@ async function fetchFromTikwm() {
 async function fetchFromPinterest() {
     const query = PINTEREST_QUERIES[Math.floor(Math.random() * PINTEREST_QUERIES.length)]
     try {
-        const candidates = await withTimeout(8000, async (signal) => {
+        const candidates = await withTimeout(6000, async (signal) => {
             const res = await fetch(`https://www.pinterest.com/search/pins/?q=${encodeURIComponent(query)}`, {
                 headers: { 'User-Agent': UA, 'Accept-Language': 'pt-BR,pt;q=0.9,en;q=0.8' },
                 signal
@@ -143,7 +198,7 @@ async function fetchFromPinterest() {
             const hq = matches.filter(u => u.includes('720p') || u.includes('720w'))
             return hq.length ? hq : matches
         })
-        return await tryUrls(candidates, 2, 12000)
+        return await tryUrls(candidates, 2)
     } catch {
         return null
     }
@@ -151,15 +206,15 @@ async function fetchFromPinterest() {
 
 /**
  * Tenta obter um vídeo curto aleatório em ordem de prioridade:
- * 1) listas oficiais do fg-team no GitHub (filtrando hosts com SSL expirado)
+ * 1) listas oficiais do fg-team no GitHub (sondando hosts saudáveis em paralelo)
  * 2) feed público do TikWM
  * 3) vídeos curtos do Pinterest
  */
 async function fetchRandomVideo() {
     const lists = await getAsupanLists()
     const providers = [
-        () => tryUrls(lists.primary, 3, 8000),
-        () => tryUrls(lists.secondary, 2, 8000),
+        () => fetchFromPool(lists.primary),
+        () => fetchFromPool(lists.secondary),
         fetchFromTikwm,
         fetchFromPinterest
     ]
