@@ -12,7 +12,9 @@ const execAsync = promisify(exec)
 
 export async function before(m, { conn, isOwner }) {
     if (m.isBaileys || m.fromMe || !m.text) return false
+    if (global.db?.data?.users?.[m.sender]?.banned) return false
     let chat = global.db.data.chats[m.chat]
+    if (chat?.isBanned) return false
     const autodlAtivo = m.isGroup ? !!(chat && chat.autodl) : true
     if (!autodlAtivo) return false
 

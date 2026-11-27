@@ -5,6 +5,7 @@ import path, { join } from 'path'
 import { unwatchFile, watchFile } from 'fs'
 import chalk from 'chalk'
 import fetch from 'node-fetch'
+import { resolveUserJidAliases } from './lib/banHelper.js'
 
 const { proto } = (await import('@whiskeysockets/baileys')).default
 const isNumber = x => typeof x === 'number' && !isNaN(x)
@@ -13,6 +14,17 @@ const delay = ms => isNumber(ms) && new Promise(resolve => setTimeout(function (
     clearTimeout(this)
     resolve()
 }, ms))
+
+async function isUserBannedInDb(conn, rawJid, resolvedJid = null) {
+    const users = global.db?.data?.users
+    if (!users) return false
+    const aliases = await resolveUserJidAliases(conn, rawJid, null)
+    if (resolvedJid) aliases.add(resolvedJid)
+    for (const j of aliases) {
+        if (users[j]?.banned === true) return true
+    }
+    return false
+}
 
 export async function handler(chatUpdate) {
 
@@ -105,6 +117,7 @@ global.db.data.licenses ||= {}
         sDemote: '',
         antiLink: false,
         nsfw: false,
+        delete: true,
         rules: '',
         antiBotClone: false,
         autodl: false,
@@ -205,6 +218,9 @@ const isPrems = isROwner || global.prems.map(v => normalize(v)).includes(sender)
 
         if (settings.sologp && !isGroup && !isOwner) return
 
+        const isSenderBanned = await isUserBannedInDb(this, m.sender, sender)
+        const isChatBanned = Boolean(global.db.data.chats?.[m.chat]?.isBanned)
+
         if (isGroup && m.text && m.text.trim().toUpperCase().startsWith('SENNA-')) {
             let code = m.text.trim().toUpperCase()
             global.db.data.licenses = global.db.data.licenses || {}
@@ -295,6 +311,14 @@ const isBotAdmin = !!bot?.admin
                 continue
             const __filename = join(___dirname, name)
 
+            if (isChatBanned && name !== 'owner-unbanchat.js')
+                continue
+
+            const isModerationHook = name === '_antilink.js' || name === '_antiBotClone.js'
+            const isBannedBlocked = isSenderBanned && !(isROwner && name === 'owner-unbanUser.js')
+            if (isBannedBlocked && !isModerationHook)
+                continue
+
             if (typeof plugin.all === 'function') {
                 if (isGroup && !isOwner) {
                     const botJid = this.user?.jid || (this.user?.id ? this.decodeJid(this.user.id) : '')
@@ -362,6 +386,9 @@ const isBotAdmin = !!bot?.admin
                     continue
             }
 
+            if (isBannedBlocked)
+                continue
+
             if (typeof plugin !== 'function')
                 continue
 
@@ -407,10 +434,9 @@ const isBotAdmin = !!bot?.admin
 
                 if (m.chat in global.db.data.chats || m.sender in global.db.data.users) {
                     let chat = global.db.data.chats[m.chat]
-                    let user = global.db.data.users[m.sender]
                     if (name != 'owner-unbanchat.js' && chat?.isBanned)
                         return
-                    if (name != 'owner-unbanUser.js' && user?.banned)
+                    if (name != 'owner-unbanUser.js' && isSenderBanned)
                         return
                 }
                 if (plugin.rowner && plugin.owner && !(isROwner || isOwner)) {
@@ -538,7 +564,7 @@ const isBotAdmin = !!bot?.admin
 
         }
 
-        if (!m.plugin && !m.isCommand && m.text && global.prefix && global.prefix.test(m.text)) {
+        if (!m.plugin && !m.isCommand && !isSenderBanned && !isChatBanned && m.text && global.prefix && global.prefix.test(m.text)) {
             const prefixMatch = m.text.match(global.prefix)
             const usedP = prefixMatch ? prefixMatch[0] : '.'
             const rawAfter = m.text.slice(usedP.length).trim()
@@ -778,11 +804,39 @@ export async function deleteUpdate(update) {
         if (raw.key.fromMe === undefined) raw.key.fromMe = false
 
         let msg = this.serializeM ? this.serializeM(raw) : raw
+        const chatJid = msg.chat || remoteJid
+        const isGroup = Boolean(chatJid?.endsWith('@g.us'))
+        const botJid = this.user?.jid || (this.user?.id ? this.decodeJid(this.user.id) : '')
+        const settings = (botJid && global.db?.data?.settings?.[botJid]) || {}
 
-        let chat = global.db.data.chats?.[msg.chat] || {}
-        if (chat.delete) return
+        const rawUser = participant || remoteJid
+        const resolvedUser = (typeof this.getJid === 'function'
+            ? await this.getJid(rawUser, isGroup ? chatJid : undefined).catch(() => null)
+            : null) || rawUser
+        const userClean = String(resolvedUser || '').split(':')[0].replace(/@.*$/, '')
+        const botClean = String(this.user?.id || '').split(':')[0].replace(/@.*$/, '')
+        const isDelOwner = Boolean(
+            (botClean && userClean === botClean) ||
+            (Array.isArray(global.owner) && global.owner.some(v => {
+                const rawOwner = String(Array.isArray(v) ? v[0] : v).replace(/[^0-9]/g, '')
+                return rawOwner && (userClean === rawOwner || String(rawUser || '').includes(rawOwner))
+            }))
+        )
 
-        let user = participant || remoteJid
+        if ((global.opts?.['self'] || global.opts?.self || settings.self) && !isDelOwner) return
+        if (settings.sologp && !isGroup && !isDelOwner) return
+        if (settings.solopv && isGroup) return
+
+        let chat = global.db.data.chats?.[chatJid] || {}
+        if (chat?.isBanned) return
+        if (isGroup && settings.restrictgp && !isDelOwner) {
+            const hasLicense = chat.expired === -1 || (chat.expired && chat.expired > Date.now())
+            if (!hasLicense) return
+        }
+        // Antidelete fica desativado por padrão; só atua quando explicitamente ligado (chat.delete === false)
+        if (chat.delete !== false) return
+
+        let user = rawUser
 
         let pushName = msg.pushName || 'Desconocido'
         let type = Object.keys(msg.message || {})[0] || 'desconocido'

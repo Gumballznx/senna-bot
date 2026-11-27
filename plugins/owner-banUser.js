@@ -1,3 +1,5 @@
+import { setUserBanned } from '../lib/banHelper.js'
+
 let handler = async (m, { conn, text, usedPrefix, command }) => {
     let user
     if (m.quoted) {
@@ -13,14 +15,9 @@ let handler = async (m, { conn, text, usedPrefix, command }) => {
         return m.reply(`✳️ Mencione o usuário ou responda a uma de suas mensagens\n\n📌 Exemplo: ${usedPrefix + command} @user`)
     }
 
-    if (typeof global.db.data.users[user] === 'undefined') {
-        global.db.data.users[user] = { banned: true }
-    } else {
-        global.db.data.users[user].banned = true
-    }
-
-    let number = user.split('@')[0]
-    conn.reply(m.chat, `✅ BANIDO\n\n───────────\n@${number} Já não poderá usar meus comandos!`, m, { mentions: [user] })
+    const { targets, displayJid } = await setUserBanned(conn, user, m.isGroup ? m.chat : undefined, true)
+    let number = displayJid.split('@')[0]
+    conn.reply(m.chat, `✅ BANIDO\n\n───────────\n@${number} Já não poderá usar meus comandos!`, m, { mentions: targets })
 }
 handler.help = ['ban @user']
 handler.tags = ['owner']

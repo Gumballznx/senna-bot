@@ -51,7 +51,7 @@ let handler = async (m, { conn, usedPrefix, command, args, isOwner, isAdmin, isR
     case 'delete':
       if (m.isGroup && !(isAdmin || isOwner)) return global.dfail('admin', m, conn)
 
-      statusMsg = checkState(!chat.delete)
+      statusMsg = checkState(chat.delete === false)
       if (statusMsg) return m.reply(statusMsg)
       chat.delete = !isEnable
       break
@@ -151,6 +151,7 @@ let handler = async (m, { conn, usedPrefix, command, args, isOwner, isAdmin, isR
       bot.solopv = isEnable
       break
 
+    case 'antipv':
     case 'sologp':
       isAll = true
       if (!isOwner) return global.dfail('owner', m, conn)
