@@ -17,7 +17,7 @@ let handler = async (m, { conn, text, usedPrefix, command }) => {
 
     const { targets, displayJid } = await setUserBanned(conn, user, m.isGroup ? m.chat : undefined, true)
     let number = displayJid.split('@')[0]
-    conn.reply(m.chat, `✅ BANIDO\n\n───────────\n@${number} Já não poderá usar meus comandos!`, m, { mentions: targets })
+    conn.reply(m.chat, `✅ BANIDO\n\n───────────\n@${number} Já não poderá usar meus comandos!`, m, { mentions: [displayJid] })
 }
 handler.help = ['ban @user']
 handler.tags = ['owner']
